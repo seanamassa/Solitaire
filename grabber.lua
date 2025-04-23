@@ -34,15 +34,10 @@ function GrabberClass:grab(x, y, button)
             local pile = allPiles[i]
             local topCard = pile:topCard()
 
-            -- Special case: Check Deck pile base click
-            if pile.type == "deck" and pile:isMouseOverBase(x, y) then
-                print("Clicked Deck Pile")
-                -- Implement deck draw logic here later
-                return true -- Indicate click was handled
-            end
-
+            -- --- CORRECTED LOGIC ---
             -- Check if clicking the top card of a pile (if it exists and is face up)
             -- Allow grabbing from Draw pile top card or Tableau top card (if face up)
+            -- DO NOT handle the base deck click here - main.lua will do that.
             if topCard and topCard.faceUp and topCard:isMouseOver(x,y) then
                  if pile.type == "draw" or pile.type == "tableau" then
                      -- TODO: Later, allow grabbing multiple cards from tableau
@@ -55,13 +50,19 @@ function GrabberClass:grab(x, y, button)
                          self.grabOffset = self.currentMousePos - self.grabbedCard.position
                          -- Make sure the card's position is immediately set correctly
                          self.grabbedCard.position = self.currentMousePos - self.grabOffset
-                         return true -- Indicate click was handled
+                         return true -- Indicate click WAS handled (we grabbed a card)
                      end
                  end
+            -- Check if clicking a face-up card lower down in a tableau stack (for multi-card grab - future)
+            -- elseif pile.type == "tableau" then
+                -- Add logic here later to check lower cards if needed
+
             end
+             -- --- END CORRECTED LOGIC ---
         end
     end
-    return false -- Click was not handled by grabber
+    -- If we didn't grab a card, return false so main.lua can check other things (like deck click)
+    return false
 end
 
 
