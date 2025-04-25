@@ -6,7 +6,7 @@ io.stdout:setvbuf("no")
 
 require "vector"
 require "card"
-require "pile" -- Make sure this matches your pile class filename!
+require "pile"
 require "grabber"
 
 -- Game Constants
