@@ -5,7 +5,7 @@ A simple Klondike Solitaire game using Lua and LOVE2D.
 
 ## Features
 
-* Standard Klondike rules & gameplay.(Game Logic for move valid moves still needs implementation)
+* Standard Klondike rules & gameplay.
 * Drag/drop cards.
 * Deck deals 3 cards, recycles.
 * Auto-flips uncovered tableau cards.
@@ -21,7 +21,8 @@ A simple Klondike Solitaire game using Lua and LOVE2D.
 ## Postmortem
 
 Good: Splitting code into classes (Card, Pile, etc.) made development easier.
-Could Improve: Rule checking logic could be more robust for complex games; adding graphics would require asset management.
+Could Improve: Rule checking logic needs some improvement I noticed a bug of being able to drop stack of cards into the suit pile
+Creating sprite assets for the cards as well as soundfx/music.
 
 ## Assets Used
 * No assets use only basic shapes that are generated in lua

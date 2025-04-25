@@ -111,9 +111,54 @@ function PileClass:isMouseOverTopCard(x, y)
     end
 end
 
--- Basic check - Can this pile potentially accept this card? (Doesn't check game rules yet)
-function PileClass:canAcceptCard(card)
-    if self.type == "deck" then return false end -- Cannot place cards on the deck
-    -- More rules needed later for foundation/tableau
-    return true
+function PileClass:canAcceptCard(cardToPlace)
+    -- Card object must have: suit, rank, color, rankValue (added in card.lua)
+    if not cardToPlace then return false end
+
+    local topCard = self:topCard()
+
+    if self.type == "tableau" then
+        if not topCard then
+            -- Empty tableau pile: Only accepts Kings
+            return cardToPlace.rank == "K"
+        else
+            -- Non-empty tableau pile: Must be face-up to accept cards
+            if not topCard.faceUp then return false end -- Cannot place on face-down card
+
+            -- Check alternating color and rank decrease
+            local colorsMatch = (topCard.color == cardToPlace.color)
+            local rankIsOneLower = (topCard.rankValue == cardToPlace.rankValue + 1)
+
+            -- print("Checking Tableau:", "Top:", topCard.rank..topCard.suit, "Place:", cardToPlace.rank..cardToPlace.suit, "Alt Color:", not colorsMatch, "Rank Lower:", rankIsOneLower)
+            return not colorsMatch and rankIsOneLower
+        end
+    elseif self.type == "foundation" then
+        if not topCard then
+            -- Empty foundation pile: Only accepts Aces
+            return cardToPlace.rank == "A"
+        else
+            -- Non-empty foundation pile: Check same suit and rank increase
+            local suitsMatch = (topCard.suit == cardToPlace.suit)
+            local rankIsOneHigher = (topCard.rankValue == cardToPlace.rankValue - 1)
+
+            -- print("Checking Foundation:", "Top:", topCard.rank..topCard.suit, "Place:", cardToPlace.rank..cardToPlace.suit, "Same Suit:", suitsMatch, "Rank Higher:", rankIsOneHigher)
+            return suitsMatch and rankIsOneHigher
+        end
+    elseif self.type == "draw" then
+        -- Cannot manually place cards on the draw pile
+        return false
+    elseif self.type == "deck" then
+        -- Cannot manually place cards on the deck pile
+        return false
+    end
+
+    return false -- Default deny
+end
+
+-- helper function to add multiple cards easily
+function PileClass:addCards(cardsToAdd)
+    for _, card in ipairs(cardsToAdd) do
+        self:addCard(card) -- Use existing addCard to handle pile reference etc.
+    end
+    -- No need to call updateCardPositions here, addCard calls it
 end

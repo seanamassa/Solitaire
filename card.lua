@@ -14,6 +14,7 @@ CARD_STATE = {
 -- Define suits and ranks
 SUITS = {"H", "D", "C", "S"} -- Hearts, Diamonds, Clubs, Spades
 RANKS = {"A", "2", "3", "4", "5", "6", "7", "8", "9", "T", "J", "Q", "K"} -- T=10
+RANK_VALUES = { A = 1, ['2'] = 2, ['3'] = 3, ['4'] = 4, ['5'] = 5, ['6'] = 6, ['7'] = 7, ['8'] = 8, ['9'] = 9, T = 10, J = 11, Q = 12, K = 13 }
 
 function CardClass:new(suit, rank)
   local card = {}
@@ -22,6 +23,7 @@ function CardClass:new(suit, rank)
 
   card.suit = suit
   card.rank = rank
+  card.rankValue = RANK_VALUES[rank]
   card.faceUp = false -- Cards start face down unless specified
   card.color = (suit == "H" or suit == "D") and "red" or "black" -- Store color for rule checking
 

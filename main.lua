@@ -172,7 +172,7 @@ end
 
 function love.mousereleased(x, y, button, istouch, presses)
     print("-- DEBUG: love.mousereleased - x:", x, "y:", y, "button:", button) -- DEBUG
-    local cardWasGrabbed = grabber.grabbedCard ~= nil
+    local cardWasGrabbed = #grabber.grabbedCards > 0 -- Check if the table is not empty
     local originalPile = grabber.grabbedFromPile -- Store before release potentially clears it
 
     -- Pass the release event to the grabber
