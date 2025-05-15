@@ -94,7 +94,7 @@ A simple Klondike Solitaire game using Lua and LOVE2D.
 * Planned Address (Future Refactor): Modify `GrabberClass:release` to check if the target is a foundation pile and if more than one card is being grabbed; if so, disallow the move. This is a planned fix.
 
 6.  Visuals & Assets:
-* Pain Point: Game uses basic shapes, lacking visual polish.
+* Pain Point: Game uses basic shapes, although I do like the approach of not using assets to complete this assignment. It would give it that extra polish that could make it visually great.
 * Planned Address (Future): Integrate card sprites by modifying `CardClass:draw` and possibly adding an asset manager.
 * Added sound fx would be a nice to have as well for a future refactoring.
 
