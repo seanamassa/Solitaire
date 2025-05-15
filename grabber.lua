@@ -1,4 +1,4 @@
--- grabber.lua
+
 require "vector"
 
 GrabberClass = {}
@@ -9,10 +9,10 @@ function GrabberClass:new()
   setmetatable(grabber, metadata)
 
   grabber.currentMousePos = Vector(love.mouse.getX(), love.mouse.getY())
-  grabber.grabOffset = Vector(0, 0) -- Offset from *top grabbed card* top-left corner
+  grabber.grabOffset = Vector(0, 0) 
 
-  grabber.grabbedCards = {} -- Changed from grabbedCard to a table
-  grabber.grabbedFromPile = nil -- Reference to the pile the card(s) came from
+  grabber.grabbedCards = {} 
+  grabber.grabbedFromPile = nil
 
   return grabber
 end
@@ -22,8 +22,6 @@ function GrabberClass:update(dt)
 
   -- If holding card(s), update their positions to follow the mouse
   if #self.grabbedCards > 0 then
-      -- Ensure TABLEAU_OFFSET_Y is accessible or defined here if not global
-      -- If pile.lua defines it globally, it might be okay, otherwise define it here:
       local TABLEAU_OFFSET_Y = 15 -- Define locally if not global
       
       local topGrabbedCardPos = self.currentMousePos - self.grabOffset
@@ -35,7 +33,7 @@ function GrabberClass:update(dt)
   end
 end
 
--- This function will be called from love.mousepressed in main.lua
+-- This function will be called from love.mousepressed in main
 function GrabberClass:grab(x, y, button)
     -- Ensure CARD_STATE is accessible (defined globally in card.lua usually)
     if button == 1 and #self.grabbedCards == 0 then -- Left click and not already holding cards
@@ -49,7 +47,6 @@ function GrabberClass:grab(x, y, button)
                 if topCard and topCard:isMouseOver(x, y) then
                      self.grabbedCards = { pile:removeCard() } -- Grab only the top card as a list
                      if #self.grabbedCards > 0 then
-                         print("Grabbed from Draw:", self.grabbedCards[1].rank .. self.grabbedCards[1].suit)
                          self.grabbedFromPile = pile
                          self.grabbedCards[1].state = CARD_STATE.GRABBED -- Assumes CARD_STATE is global
                          self.grabOffset = self.currentMousePos - self.grabbedCards[1].position
@@ -69,8 +66,6 @@ function GrabberClass:grab(x, y, button)
                         self.grabbedCards = {}
                         self.grabbedFromPile = pile
                         local cardsToRemove = #pile.cards - cardIndex + 1
-
-                        print("Attempting to grab stack of", cardsToRemove, "from Tableau starting with", card.rank..card.suit)
 
                         -- Remove cards from tableau pile and add to grabbedCards
                         local tempRemovedCards = {}
@@ -116,9 +111,7 @@ end
 
 
 function GrabberClass:release(x, y, button)
-    -- Ensure CARD_STATE is accessible (defined globally in card.lua usually)
     if button == 1 and #self.grabbedCards > 0 then -- Left release while holding card(s)
-        print("Released:", self.grabbedCards[1].rank .. self.grabbedCards[1].suit, "(", #self.grabbedCards, "card(s))")
         local cardDropped = false
         local bottomGrabbedCard = self.grabbedCards[1] -- The card that needs to follow the rule
 
@@ -129,7 +122,6 @@ function GrabberClass:release(x, y, button)
              if pile ~= self.grabbedFromPile and (pile:isMouseOverBase(x, y) or pile:isMouseOverTopCard(x, y)) then -- Don't drop onto self
                   -- Check rules using the BOTTOM card of the grabbed stack
                   if pile:canAcceptCard(bottomGrabbedCard) then
-                     print("Dropped onto pile type:", pile.type, "at", pile.position.x)
                      -- Use the addCards method from pile.lua
                      pile:addCards(self.grabbedCards)
                      -- Set state for all dropped cards
@@ -144,17 +136,16 @@ function GrabberClass:release(x, y, button)
 
         -- If not dropped successfully onto a new pile, return it to the original pile
         if not cardDropped then
-            print("Returned to pile type:", self.grabbedFromPile.type)
             -- Use the addCards method from pile.lua
             self.grabbedFromPile:addCards(self.grabbedCards)
              -- Set state for all returned cards
             for _, card in ipairs(self.grabbedCards) do
-               card.state = CARD_STATE.IDLE -- Assumes CARD_STATE is global
+               card.state = CARD_STATE.IDLE
             end
         end
 
         -- Reset grabber state regardless of success
-        local originalPile = self.grabbedFromPile -- Keep ref for main.lua reveal check
+        local originalPile = self.grabbedFromPile
         self.grabbedCards = {}
         self.grabbedFromPile = nil
         self.grabOffset = Vector(0, 0)
@@ -166,7 +157,7 @@ end
 function GrabberClass:draw()
     if #self.grabbedCards > 0 then
         -- Ensure TABLEAU_OFFSET_Y is accessible
-        local TABLEAU_OFFSET_Y = 15 -- Define locally if not global
+        local TABLEAU_OFFSET_Y = 15
         -- Draw from bottom up so top cards overlap correctly
         for i = #self.grabbedCards, 1, -1 do
             self.grabbedCards[i]:draw()

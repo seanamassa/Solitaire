@@ -7,7 +7,7 @@ CARD_WIDTH = 50
 CARD_HEIGHT = 70
 CARD_STATE = {
   IDLE = 0,
-  MOUSE_OVER = 1, -- We might not use this state initially
+  MOUSE_OVER = 1,
   GRABBED = 2
 }
 
@@ -40,9 +40,6 @@ function CardClass:update(dt)
 end
 
 function CardClass:draw()
-  -- Draw card shadow/outline (optional)
-  -- love.graphics.setColor(0, 0, 0, 0.5)
-  -- love.graphics.rectangle("fill", self.position.x + 2, self.position.y + 2, self.size.x, self.size.y, 6, 6)
 
   if self.faceUp then
     -- Draw Face Up Card
@@ -65,7 +62,6 @@ function CardClass:draw()
     -- Draw Face Down Card (e.g., blue back)
     love.graphics.setColor(0.2, 0.4, 0.8, 1) -- Blue back
     love.graphics.rectangle("fill", self.position.x, self.position.y, self.size.x, self.size.y, 6, 6)
-    -- You could draw a pattern on the back here too
   end
 
   -- Draw outline
@@ -73,8 +69,6 @@ function CardClass:draw()
   love.graphics.rectangle("line", self.position.x, self.position.y, self.size.x, self.size.y, 6, 6)
   love.graphics.setColor(1, 1, 1, 1) -- Reset color
 
-  -- Debug state (optional)
-  -- love.graphics.print(tostring(self.state), self.position.x + 20, self.position.y - 20)
 end
 
 

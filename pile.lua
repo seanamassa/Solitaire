@@ -122,14 +122,12 @@ function PileClass:canAcceptCard(cardToPlace)
             -- Empty tableau pile: Only accepts Kings
             return cardToPlace.rank == "K"
         else
-            -- Non-empty tableau pile: Must be face-up to accept cards
+            -- Non-empty tableau pile: Must be face-up to accept cards 
             if not topCard.faceUp then return false end -- Cannot place on face-down card
 
             -- Check alternating color and rank decrease
             local colorsMatch = (topCard.color == cardToPlace.color)
             local rankIsOneLower = (topCard.rankValue == cardToPlace.rankValue + 1)
-
-            -- print("Checking Tableau:", "Top:", topCard.rank..topCard.suit, "Place:", cardToPlace.rank..cardToPlace.suit, "Alt Color:", not colorsMatch, "Rank Lower:", rankIsOneLower)
             return not colorsMatch and rankIsOneLower
         end
     elseif self.type == "foundation" then
@@ -140,8 +138,6 @@ function PileClass:canAcceptCard(cardToPlace)
             -- Non-empty foundation pile: Check same suit and rank increase
             local suitsMatch = (topCard.suit == cardToPlace.suit)
             local rankIsOneHigher = (topCard.rankValue == cardToPlace.rankValue - 1)
-
-            -- print("Checking Foundation:", "Top:", topCard.rank..topCard.suit, "Place:", cardToPlace.rank..cardToPlace.suit, "Same Suit:", suitsMatch, "Rank Higher:", rankIsOneHigher)
             return suitsMatch and rankIsOneHigher
         end
     elseif self.type == "draw" then

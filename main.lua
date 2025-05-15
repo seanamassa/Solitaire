@@ -1,7 +1,6 @@
--- Sean Massa 
--- 4-17-25 Solitaire
+-- Sean Massa
+-- 5-14-25 Solitaire (ADDED Win/Reset/Undo)
 
--- main.lua
 io.stdout:setvbuf("no")
 
 require "vector"
@@ -12,26 +11,39 @@ require "grabber"
 -- Game Constants
 WINDOW_WIDTH = 960
 WINDOW_HEIGHT = 640
-CARD_MARGIN = 15 -- Spacing between piles
+CARD_MARGIN = 15
+
+-- Button Constants
+RESET_BUTTON_X = WINDOW_WIDTH - 100
+RESET_BUTTON_Y = WINDOW_HEIGHT - 40
+RESET_BUTTON_WIDTH = 80
+RESET_BUTTON_HEIGHT = 30
+
+UNDO_BUTTON_X = WINDOW_WIDTH - 100 - RESET_BUTTON_WIDTH - CARD_MARGIN
+UNDO_BUTTON_Y = WINDOW_HEIGHT - 40
+UNDO_BUTTON_WIDTH = 80
+UNDO_BUTTON_HEIGHT = 30
+
 
 -- Global Game Objects
 grabber = nil
-allPiles = {} -- Unified list of all piles for easy iteration
+allPiles = {}
 deckPile = nil
 drawPile = nil
 foundationPiles = {}
 tableauPiles = {}
+gameState = "playing" -- "playing", "won"
+moveHistory = {}
 
 
 function love.load()
   love.window.setMode(WINDOW_WIDTH, WINDOW_HEIGHT, {resizable=false, vsync=true})
   love.window.setTitle("Klondike Solitaire")
-  love.graphics.setBackgroundColor(0.1, 0.5, 0.1, 1) -- Darker green
+  love.graphics.setBackgroundColor(0.1, 0.5, 0.1, 1)
 
-  math.randomseed(os.time()) -- Seed random number generator
+  math.randomseed(os.time())
 
   grabber = GrabberClass:new()
-  print("-- DEBUG: Grabber created.") -- DEBUG
 
   setupGame()
 end
@@ -46,7 +58,6 @@ function createDeck()
     return deck
 end
 
--- Fisher-Yates Shuffle
 function shuffleDeck(deck)
     for i = #deck, 2, -1 do
         local j = math.random(i)
@@ -55,24 +66,24 @@ function shuffleDeck(deck)
 end
 
 function setupGame()
-    print("-- DEBUG: Starting setupGame().") -- DEBUG
-    -- Create and position Piles
-    allPiles = {} -- Clear previous piles if restarting
+    allPiles = {}
+    foundationPiles = {}
+    tableauPiles = {}
+    moveHistory = {}
 
-    -- Deck Pile (Top Left)
+    -- Deck Pile
     local deckX = CARD_MARGIN
     local deckY = CARD_MARGIN
     deckPile = PileClass:new(deckX, deckY, "deck")
     table.insert(allPiles, deckPile)
 
-    -- Draw Pile (Next to Deck)
+    -- Draw Pile
     local drawX = deckX + CARD_WIDTH + CARD_MARGIN
     local drawY = deckY
     drawPile = PileClass:new(drawX, drawY, "draw")
     table.insert(allPiles, drawPile)
 
-    -- Foundation Piles (Top Right)
-    foundationPiles = {}
+    -- Foundation Piles
     local foundationXStart = WINDOW_WIDTH - (4 * (CARD_WIDTH + CARD_MARGIN)) + CARD_MARGIN/2
     for i = 1, 4 do
         local foundationX = foundationXStart + (i-1) * (CARD_WIDTH + CARD_MARGIN)
@@ -82,8 +93,7 @@ function setupGame()
         table.insert(allPiles, pile)
     end
 
-    -- Tableau Piles (Below Deck/Draw/Foundation)
-    tableauPiles = {}
+    -- Tableau Piles
     local tableauY = deckY + CARD_HEIGHT + CARD_MARGIN * 2
     for i = 1, 7 do
         local tableauX = CARD_MARGIN + (i-1) * (CARD_WIDTH + CARD_MARGIN)
@@ -91,143 +101,299 @@ function setupGame()
         table.insert(tableauPiles, pile)
         table.insert(allPiles, pile)
     end
-    print("-- DEBUG: All piles created. Total piles:", #allPiles) -- DEBUG
 
-    -- Create, Shuffle, and Deal Deck
     local fullDeck = createDeck()
-    print("-- DEBUG: Deck created. Size:", #fullDeck) -- DEBUG
     shuffleDeck(fullDeck)
-    print("-- DEBUG: Deck shuffled.") -- DEBUG
 
     -- Deal to Tableau
-    for i = 1, 7 do -- For each tableau pile
-        for j = i, 7 do -- Deal one card to this pile and subsequent piles
+    for i = 1, 7 do
+        for j = i, 7 do
+            if #fullDeck == 0 then goto end_tableau_deal end
             local card = table.remove(fullDeck)
-            if card then
-                card.faceUp = (i == j) -- Only the last card dealt to a pile is face up
-                tableauPiles[j]:addCard(card)
-            else
-                print("Error: Deck ran out during tableau deal!")
-                break
-            end
+            card.faceUp = (i == j)
+            tableauPiles[j]:addCard(card)
         end
-         if not fullDeck or #fullDeck == 0 then print("-- DEBUG: Deck empty after tableau deal loop", i); break end -- Exit outer loop if deck ran out
     end
-    print("-- DEBUG: Tableau dealt.") -- DEBUG
+    ::end_tableau_deal::
 
-    -- Put remaining cards in Deck Pile (face down)
-    local remaining = #fullDeck
+    -- Put remaining cards in Deck Pile
     for i = #fullDeck, 1, -1 do
         local card = table.remove(fullDeck)
-        card.faceUp = false -- Ensure they are face down in the deck
+        card.faceUp = false
         deckPile:addCard(card)
     end
 
-    print("-- DEBUG: Game Setup Complete. Deck cards remaining:", #deckPile.cards, "(Expected", remaining, ")") -- DEBUG
+    gameState = "playing"
+end
+
+function recordMove(moveData)
+    table.insert(moveHistory, moveData)
+end
+
+function undoLastMove()
+    if #moveHistory == 0 then
+        return
+    end
+
+    local lastMove = table.remove(moveHistory)
+
+    if lastMove.type == "move" then
+        for i = #lastMove.cards, 1, -1 do
+            local cardFound = false
+            for k = #lastMove.toPile.cards, 1, -1 do
+                if lastMove.toPile.cards[k] == lastMove.cards[i] then
+                    table.remove(lastMove.toPile.cards, k)
+                    cardFound = true
+                    break
+                end
+            end
+        end
+        lastMove.fromPile:addCards(lastMove.cards)
+
+        if lastMove.revealedCard then
+            lastMove.revealedCard.faceUp = false
+        end
+        lastMove.fromPile:updateCardPositions()
+        lastMove.toPile:updateCardPositions()
+
+    elseif lastMove.type == "drawDeck" then
+        for i = #lastMove.cardsDrawn, 1, -1 do
+            local cardFound = false
+            for k = #drawPile.cards, 1, -1 do
+                if drawPile.cards[k] == lastMove.cardsDrawn[i] then
+                    table.remove(drawPile.cards, k)
+                    cardFound = true
+                    break
+                end
+            end
+        end
+
+        for i = #lastMove.cardsDrawn, 1, -1 do
+            lastMove.cardsDrawn[i].faceUp = false
+            deckPile:addCard(lastMove.cardsDrawn[i])
+        end
+        deckPile:updateCardPositions()
+        drawPile:updateCardPositions()
+
+    elseif lastMove.type == "recycleDeck" then
+        for i = #lastMove.cardsRecycled, 1, -1 do
+            local cardFound = false
+            for k = #deckPile.cards, 1, -1 do
+                if deckPile.cards[k] == lastMove.cardsRecycled[i] then
+                    table.remove(deckPile.cards, k)
+                    cardFound = true
+                    break
+                end
+            end
+        end
+
+        for i = #lastMove.cardsRecycled, 1, -1 do
+            lastMove.cardsRecycled[i].faceUp = true
+            drawPile:addCard(lastMove.cardsRecycled[i])
+        end
+        deckPile:updateCardPositions()
+        drawPile:updateCardPositions()
+    end
+    if gameState == "won" then
+        gameState = "playing"
+    end
 end
 
 
 function love.update(dt)
-  grabber:update(dt)
+  if gameState == "playing" then
+    grabber:update(dt)
+  end
 end
 
 function love.draw()
-  -- Draw Piles (which will draw their cards)
   for _, pile in ipairs(allPiles) do
     pile:draw()
   end
 
-  -- Draw the grabbed card last so it's on top
-  grabber:draw()
+  if gameState == "playing" then
+    grabber:draw()
+  end
 
-  -- Draw Mouse position (Debug)
   love.graphics.setColor(1, 1, 1, 1)
-  love.graphics.print("Mouse: " .. math.floor(grabber.currentMousePos.x) .. ", " ..
-    math.floor(grabber.currentMousePos.y), 5, WINDOW_HEIGHT - 20)
+  --love.graphics.print("Mouse: " .. math.floor(love.mouse.getX()) .. ", " ..
+  --  math.floor(love.mouse.getY()), 5, WINDOW_HEIGHT - 20)
 
-  if grabber.grabbedCard then
-     love.graphics.print("Holding: " .. grabber.grabbedCard.rank..grabber.grabbedCard.suit, 150, WINDOW_HEIGHT - 20)
+  if #grabber.grabbedCards > 0 then
+     --love.graphics.print("Holding: " .. grabber.grabbedCards[1].rank..grabber.grabbedCards[1].suit .. " (" .. #grabber.grabbedCards .. ")", 150, WINDOW_HEIGHT - 20)
+  end
+
+  -- Draw Reset Button
+  love.graphics.setColor(0.7, 0.7, 0.7, 1)
+  love.graphics.rectangle("fill", RESET_BUTTON_X, RESET_BUTTON_Y, RESET_BUTTON_WIDTH, RESET_BUTTON_HEIGHT, 5, 5)
+  love.graphics.setColor(0, 0, 0, 1)
+  love.graphics.printf("Reset", RESET_BUTTON_X, RESET_BUTTON_Y + RESET_BUTTON_HEIGHT/2 - 7, RESET_BUTTON_WIDTH, "center")
+
+  -- Draw Undo Button
+  love.graphics.setColor(0.7, 0.7, 0.7, 1)
+  love.graphics.rectangle("fill", UNDO_BUTTON_X, UNDO_BUTTON_Y, UNDO_BUTTON_WIDTH, UNDO_BUTTON_HEIGHT, 5, 5)
+  love.graphics.setColor(0, 0, 0, 1)
+  love.graphics.printf("Undo", UNDO_BUTTON_X, UNDO_BUTTON_Y + UNDO_BUTTON_HEIGHT/2 - 7, UNDO_BUTTON_WIDTH, "center")
+  love.graphics.setColor(1,1,1,1)
+
+  if gameState == "won" then
+    love.graphics.setColor(0, 0, 0, 0.7)
+    love.graphics.rectangle("fill", 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT)
+    love.graphics.setColor(0, 1, 0, 1)
+    local winFont = love.graphics.setNewFont(48)
+    love.graphics.printf("You Win!", 0, WINDOW_HEIGHT/2 - 50, WINDOW_WIDTH, "center")
+    love.graphics.setFont(winFont)
+    love.graphics.setColor(1,1,1,1)
   end
 end
 
+function checkForWin()
+    if #foundationPiles ~= 4 then return false end
+    for _, pile in ipairs(foundationPiles) do
+        if #pile.cards ~= 13 then
+            return false
+        end
+    end
+    return true
+end
 
 function love.mousepressed(x, y, button, istouch, presses)
-    print("-- DEBUG: love.mousepressed - x:", x, "y:", y, "button:", button) -- DEBUG
-    -- Pass the click event to the grabber first
-    local handled = grabber:grab(x, y, button)
-    print("-- DEBUG: grabber:grab handled click:", handled) -- DEBUG
+    if button == 1 and
+       x >= RESET_BUTTON_X and x <= RESET_BUTTON_X + RESET_BUTTON_WIDTH and
+       y >= RESET_BUTTON_Y and y <= RESET_BUTTON_Y + RESET_BUTTON_HEIGHT then
+        setupGame()
+        return
+    end
 
-    -- If the grabber didn't handle it (e.g., didn't click a grabbable card),
-    -- check for other interactions, like clicking the deck pile base.
-    if not handled and button == 1 then
-        print("-- DEBUG: Checking for deck pile click.") -- DEBUG
-        if deckPile and deckPile:isMouseOverBase(x, y) then -- Added check for deckPile existing
-            print("-- DEBUG: Clicked Deck Base (mousepressed). Calling dealFromDeckToDraw.") -- DEBUG
-            dealFromDeckToDraw()
-        else
-            print("-- DEBUG: Did not click deck pile base.") -- DEBUG
+    if button == 1 and
+       x >= UNDO_BUTTON_X and x <= UNDO_BUTTON_X + UNDO_BUTTON_WIDTH and
+       y >= UNDO_BUTTON_Y and y <= UNDO_BUTTON_Y + UNDO_BUTTON_HEIGHT then
+        if gameState == "playing" or #moveHistory > 0 then
+            undoLastMove()
+        end
+        return
+    end
+
+    if gameState == "playing" then
+        local handledByGrabber = grabber:grab(x, y, button)
+
+        if not handledByGrabber and button == 1 then
+            if deckPile and deckPile:isMouseOverBase(x, y) then
+                dealFromDeckToDraw()
+            end
         end
     end
 end
 
 function love.mousereleased(x, y, button, istouch, presses)
-    print("-- DEBUG: love.mousereleased - x:", x, "y:", y, "button:", button) -- DEBUG
-    local cardWasGrabbed = #grabber.grabbedCards > 0 -- Check if the table is not empty
-    local originalPile = grabber.grabbedFromPile -- Store before release potentially clears it
+    if gameState ~= "playing" then return end
 
-    -- Pass the release event to the grabber
-    grabber:release(x, y, button)
-    print("-- DEBUG: grabber:release called.") -- DEBUG
+    local cardWasGrabbedInitially = #grabber.grabbedCards > 0 -- State before release
+    local originalPileFromGrabber = grabber.grabbedFromPile   -- Pile before release potentially modifies it
+    local cardsAboutToMove = {}
+    if cardWasGrabbedInitially then
+        for _, c in ipairs(grabber.grabbedCards) do table.insert(cardsAboutToMove, c) end
+    end
 
-    -- After releasing, check if we need to turn over a tableau card
-    -- Check if a card *was* being held, and it came from a tableau pile
-    if cardWasGrabbed and button == 1 and originalPile and originalPile.type == "tableau" then
-        print("-- DEBUG: Checking for tableau card reveal on pile:", originalPile.position.x) -- DEBUG
-        local topCard = originalPile:topCard()
-        if topCard and not topCard.faceUp then
-             print("-- DEBUG: Turning card face up on tableau pile:", topCard.rank..topCard.suit) -- DEBUG
-             topCard.faceUp = true
-        elseif topCard then
-             print("-- DEBUG: New top card already face up or no card to turn.") -- DEBUG
-        else
-             print("-- DEBUG: No top card on original tableau pile.") -- DEBUG
+    local tempTargetPile = nil -- To determine if a valid drop location was targeted
+    if cardWasGrabbedInitially then
+        for i = #allPiles, 1, -1 do
+             local pile = allPiles[i]
+             if pile ~= originalPileFromGrabber and (pile:isMouseOverBase(x, y) or pile:isMouseOverTopCard(x, y)) then
+                  if pile:canAcceptCard(grabber.grabbedCards[1]) then
+                     tempTargetPile = pile
+                     break
+                  end
+             end
         end
-    else
-         print("-- DEBUG: No tableau reveal check needed (card not grabbed, not button 1, or not from tableau).") -- DEBUG
+    end
+
+    -- Perform the release action - this will move cards if valid, or return them
+    grabber:release(x, y, button)
+
+    local revealedCardForUndo = nil
+
+    -- Check for tableau reveal IF cards were initially grabbed AND came from a tableau pile
+    if cardWasGrabbedInitially and originalPileFromGrabber and originalPileFromGrabber.type == "tableau" then
+
+        local cardsWereSuccessfullyMovedAway = false
+        if tempTargetPile then -- A valid target was identified
+            -- Check if the first card of the moved stack is now in tempTargetPile
+            if #cardsAboutToMove > 0 and cardsAboutToMove[1].pile == tempTargetPile then
+                cardsWereSuccessfullyMovedAway = true
+            end
+        end
+
+        if cardsWereSuccessfullyMovedAway then
+            local topCardAfterMove = originalPileFromGrabber:topCard()
+            if topCardAfterMove and not topCardAfterMove.faceUp then
+                topCardAfterMove.faceUp = true
+                revealedCardForUndo = topCardAfterMove
+            end
+        end
+    end
+
+    -- Record the move if it was successful and a target was identified
+    if cardWasGrabbedInitially and tempTargetPile then
+        -- Check if the drop was actually successful (cards are in tempTargetPile)
+        local cardsActuallyInTarget = true
+        if #cardsAboutToMove > 0 then
+            local firstMovedCard = cardsAboutToMove[1]
+            if firstMovedCard.pile ~= tempTargetPile then
+                cardsActuallyInTarget = false
+            end
+        else
+            cardsActuallyInTarget = false -- No cards were about to move
+        end
+
+        if cardsActuallyInTarget then
+            recordMove({
+                type = "move",
+                cards = cardsAboutToMove,
+                fromPile = originalPileFromGrabber, -- Use the stored reference
+                toPile = tempTargetPile,
+                revealedCard = revealedCardForUndo
+            })
+            if checkForWin() then
+                gameState = "won"
+                print("-------------------------")
+                print("------ YOU WIN! ---------")
+                print("-------------------------")
+            end
+        end
     end
 end
 
--- Logic to move cards from Deck to Draw pile
 function dealFromDeckToDraw()
-    print("-- DEBUG: dealFromDeckToDraw called.") -- DEBUG
-    -- Number of cards to draw
     local numToDraw = 3
+    local cardsDrawnForHistory = {}
 
     if #deckPile.cards == 0 then
-        -- Recycle Draw pile back to Deck
-        print("-- DEBUG: Recycling Draw Pile to Deck. Draw pile size:", #drawPile.cards) -- DEBUG
-        while #drawPile.cards > 0 do
-            local card = drawPile:removeCard()
-            card.faceUp = false -- Put back face down
-            deckPile:addCard(card)
+        if #drawPile.cards > 0 then
+            local cardsRecycledForHistory = {}
+            for i = 1, #drawPile.cards do table.insert(cardsRecycledForHistory, drawPile.cards[i]) end
+
+            while #drawPile.cards > 0 do
+                local card = drawPile:removeCard()
+                card.faceUp = false
+                deckPile:addCard(card)
+            end
+            recordMove({type = "recycleDeck", cardsRecycled = cardsRecycledForHistory})
         end
-        print("-- DEBUG: Recycle complete. Deck size:", #deckPile.cards) -- DEBUG
     else
-        -- Move up to 3 cards
-        print("-- DEBUG: Dealing from Deck. Cards in deck:", #deckPile.cards) -- DEBUG
         for i = 1, numToDraw do
             local card = deckPile:removeCard()
             if card then
                 card.faceUp = true
                 drawPile:addCard(card)
-                print("-- DEBUG: Dealt", card.rank..card.suit, "to Draw Pile") -- DEBUG
+                table.insert(cardsDrawnForHistory, card)
             else
-                print("-- DEBUG: Deck empty, cannot deal more.") -- DEBUG
-                break -- Stop if deck runs out
+                break
             end
         end
-         -- Ensure draw pile cards stack correctly for drawing
+        if #cardsDrawnForHistory > 0 then
+            recordMove({type = "drawDeck", cardsDrawn = cardsDrawnForHistory})
+        end
          drawPile:updateCardPositions()
-         print("-- DEBUG: Draw pile updated. Size:", #drawPile.cards) -- DEBUG
     end
 end
